@@ -11,6 +11,13 @@ Proxy for serving files from Elgg's filestore
  * Server that does not boot the engine
  * HMAC-based security layer
 
+
+## Install
+
+```sh
+composer require hypejunction/proxy
+```
+
 ## Usage
 
 

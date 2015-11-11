@@ -1,0 +1,25 @@
+{
+	"name": "hypejunction/proxy",
+	"type": "elgg-plugin",
+	"description": "Proxy for serving files from Elgg's filestore",
+	"homepage": "http://hypejunction.com",
+	"keywords": [
+		"elgg", "plugin", "proxy", "files", "server"
+	],
+	"license": "GPL-2.0",
+	"authors": [
+		{
+			"name": "Ismayil Khayredinov",
+			"email": "info@hypejunction.com"
+		}
+	],
+	"require-dev": {
+		"composer/installers": "1.*"
+	},
+	"autoload": {
+		"psr-0": {
+			"": "classes/"
+		}
+	}
+}
+

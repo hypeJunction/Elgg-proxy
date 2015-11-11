@@ -117,8 +117,11 @@ class Server {
 		header("Content-Length: $filesize");
 		
 		header("Content-type: $mime");
-		if ($this->disposition) {
-			header("Content-disposition: $this->disposition");
+		if ($this->disposition == 'inline') {
+			header("Content-disposition: inline");
+		} else {
+			$basename = basename($filenameonfilestore);
+			header("Content-disposition: attachment; filename='$basename'");
 		}
 
 		$expires = $this->expires ? gmdate('D, d M Y H:i:s \G\M\T', $this->expires) : gmdate('D, d M Y H:i:s \G\M\T', strtotime("+3 years"));

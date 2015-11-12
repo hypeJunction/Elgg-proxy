@@ -20,12 +20,12 @@ class Server {
 			return;
 		}
 		
-		if (!preg_match('~/e(\d+)/a(\d+)/l(\d+)/d([ia])/k([cs])/([a-zA-Z0-9\-_]+)/(.*)$~', $uri, $m)) {
+		if (!preg_match('~/e(\d+)/a(\d+)/l(\d+)/d([ia])/p([01])/([a-zA-Z0-9\-_]+)/(.*)$~', $uri, $m)) {
 			header("HTTP/1.1 400 Bad Request");
 			exit;
 		}
 
-		list(, $expires, $access_id, $last_updated, $disposition, $key_type, $mac, $path) = $m;
+		list(, $expires, $access_id, $last_updated, $disposition, $persistent, $mac, $path) = $m;
 
 		if ($expires && $expires < time()) {
 			header("HTTP/1.1 403 Forbidden");
@@ -38,15 +38,18 @@ class Server {
 			exit;
 		}
 
-		$key = $key_type == 'c' ? $this->getSessionCookie() : $this->getSiteSecret();
+		$key = $this->getSiteSecret();
 		$hmac_data = array(
 			'expires' => (int) $expires,
 			'last_updated' => (int) $last_updated,
 			'access_id' => (int) $access_id,
 			'disposition' => $disposition,
 			'path' => $path,
-			'key_type' => $key_type,
+			'persistent' => (int) $persistent,
 		);
+		if (!(bool) $persistent) {
+			$hmac_data['cookie'] = $this->getSessionCookie();
+		}
 		ksort($hmac_data);
 
 		$hmac = _elgg_services()->crypto->getHmac($hmac_data, 'sha256', $key);

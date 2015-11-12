@@ -58,19 +58,19 @@ class Proxy {
 			'path' => $relative_path,
 		);
 
-		if (!$persistent) {
-			$key = $this->getSessionCookie();
-			$data['key_type'] = 'c';
-		}
-		if (!$key) {
-			$key = $this->getSiteSecret();
-			$data['key_type'] = 's';
+		
+		$key = $this->getSiteSecret();
+		if ($persistent) {
+			$data['persistent'] = 1;
+		} else {
+			$data['cookie'] = $this->getSessionCookie();
+			$data['persistent'] = 0;
 		}
 
 		ksort($data);
 		$mac = _elgg_services()->crypto->getHmac($data, 'sha256', $key)->getToken();
 
-		return elgg_normalize_url("mod/proxy/e{$data['expires']}/a{$data['access_id']}/l{$data['last_updated']}/d{$data['disposition']}/k{$data['key_type']}/$mac/$relative_path");
+		return elgg_normalize_url("mod/proxy/e{$data['expires']}/a{$data['access_id']}/l{$data['last_updated']}/d{$data['disposition']}/p{$data['persistent']}/$mac/$relative_path");
 	}
 
 	/**

@@ -8,97 +8,60 @@ namespace hypeJunction\Proxy;
  */
 class Server {
 
-	const READ = 'read';
-	const WRITE = 'write';
-	const READ_WRITE = 'readwrite';
-
-	private $config;
-	private $dbPrefix;
-	private $dbLink;
-
-	private $path;
-	private $expires;
-	private $last_updated;
-	private $access_id;
-	private $disposition;
-	private $hmac;
-
 	/**
-	 * Constructor
+	 * Serve URI
 	 *
-	 * @param array  $config Elgg Config
-	 * @param string $uri    Request URI
+	 * @param string $uri URI
+	 * @return void
 	 */
-	public function __construct($config, $uri) {
-
-		$this->config = $config;
-		$this->dbPrefix = $config->dbprefix;
-		
-		$segments = explode('/', $uri);
-		$query_hash = array_shift($segments);
-		$this->path = implode('/', $segments);
-
-		$query = unserialize(base64_decode($query_hash));
-
-		$this->hmac = $query['hmac'];
-		$this->expires = (int) $query['expires'];
-		$this->last_updated = (int) $query['last_updated'];
-		$this->access_id = (int) $query['access_id'];
-		$this->disposition = $query['disposition'];
-	}
-
-	/**
-	 * {@inheritdoc}
-	 */
-	public function serve() {
+	public function serve($uri = '') {
 
 		if (headers_sent()) {
 			return;
 		}
-
-		if ($this->expires && $this->expires < time()) {
-			header("HTTP/1.1 403 Forbidden");
-			exit;
-		}
-
-		if (!$this->hmac || !$this->path) {
+		
+		if (!preg_match('~/e(\d+)/a(\d+)/l(\d+)/d([ia])/k([cs])/([a-zA-Z0-9\-_]+)/(.*)$~', $uri, $m)) {
 			header("HTTP/1.1 400 Bad Request");
 			exit;
 		}
 
-		$etag = md5($this->last_updated);
+		list(, $expires, $access_id, $last_updated, $disposition, $key_type, $mac, $path) = $m;
+
+		if ($expires && $expires < time()) {
+			header("HTTP/1.1 403 Forbidden");
+			exit;
+		}
+
+		$etag = md5($last_updated);
 		if (isset($_SERVER['HTTP_IF_NONE_MATCH']) && trim($_SERVER['HTTP_IF_NONE_MATCH']) == "\"$etag\"") {
 			header("HTTP/1.1 304 Not Modified");
 			exit;
 		}
 
-		$this->openDbLink();
-		$values = $this->getDatalistValue(array('dataroot', '__site_secret__'));
-		$this->closeDbLink();
-
-		if (empty($values)) {
-			header("HTTP/1.1 404 Not Found");
-			exit;
-		}
-
-		$data_root = $values['dataroot'];
-		$key = $values['__site_secret__'];
-
+		$key = $key_type == 'c' ? $this->getSessionCookie() : $this->getSiteSecret();
 		$hmac_data = array(
-			'expires' => $this->expires,
-			'last_updated' => $this->last_updated,
-			'access_id' => $this->access_id,
-			'disposition' => $this->disposition,
-			'path' => $this->path,
+			'expires' => (int) $expires,
+			'last_updated' => (int) $last_updated,
+			'access_id' => (int) $access_id,
+			'disposition' => $disposition,
+			'path' => $path,
+			'key_type' => $key_type,
 		);
-		
-		$hmac = HMAC::getHash($hmac_data, $key);
-		if ($this->hmac !== $hmac) {
+		ksort($hmac_data);
+
+		$hmac = _elgg_services()->crypto->getHmac($hmac_data, 'sha256', $key);
+		if (!$hmac->matchesToken($mac)) {
 			header("HTTP/1.1 403 Forbidden");
 			exit;
 		}
 
-		$filenameonfilestore = "{$data_root}{$this->path}";
+		$dataroot = _elgg_services()->config->get('dataroot');
+		if (empty($dataroot)) {
+			header("HTTP/1.1 404 Not Found");
+			exit;
+		}
+
+		$filenameonfilestore = "{$dataroot}{$path}";
 
 		if (!is_readable($filenameonfilestore)) {
 			header("HTTP/1.1 404 Not Found");
@@ -115,22 +78,24 @@ class Server {
 
 		$filesize = filesize($filenameonfilestore);
 		header("Content-Length: $filesize");
-		
+
 		header("Content-type: $mime");
-		if ($this->disposition == 'inline') {
+		if ($disposition == 'i') {
 			header("Content-disposition: inline");
 		} else {
 			$basename = basename($filenameonfilestore);
 			header("Content-disposition: attachment; filename='$basename'");
 		}
 
-		$expires = $this->expires ? gmdate('D, d M Y H:i:s \G\M\T', $this->expires) : gmdate('D, d M Y H:i:s \G\M\T', strtotime("+3 years"));
-		header('Expires: ' . $expires, true);
+		if ($expires) {
+			$expires_str = gmdate('D, d M Y H:i:s \G\M\T', $expires);
+		} else {
+			$expires_str = gmdate('D, d M Y H:i:s \G\M\T', strtotime("+3 years"));
+		}
+
+		header('Expires: ' . $expires_str, true);
 		header("Pragma: public");
 		header("Cache-Control: public");
-
-
-
 		header("ETag: \"$etag\"");
 
 		readfile($filenameonfilestore);
@@ -138,195 +103,22 @@ class Server {
 	}
 
 	/**
-	 * Returns DB config
-	 * @return array
+	 * Get current session cookie
+	 * @return string
 	 */
-	protected function getDbConfig() {
-		if ($this->isDatabaseSplit()) {
-			return $this->getConnectionConfig(self::READ);
-		}
-		return $this->getConnectionConfig(self::READ_WRITE);
+	private function getSessionCookie() {
+		$global_cookies_config = _elgg_services()->config->get('cookies');
+		$cookie_config = $global_cookies_config['session'];
+		$cookie_name = $cookie_config['name'];
+		return _elgg_services()->request->cookies->get($cookie_name, '');
 	}
 
 	/**
-	 * Connects to DB
-	 * @return void
+	 * Get site secret
+	 * @return string
 	 */
-	protected function openDbLink() {
-		$dbConfig = $this->getDbConfig();
-		$this->dbLink = @mysql_connect($dbConfig['host'], $dbConfig['user'], $dbConfig['password'], true);
-	}
-
-	/**
-	 * Closes DB connection
-	 * @return void
-	 */
-	protected function closeDbLink() {
-		if ($this->dbLink) {
-			mysql_close($this->dbLink);
-		}
-	}
-
-	/**
-	 * Retreive values from datalists table
-	 *
-	 * @param array $names Parameter names to retreive
-	 * @return array
-	 */
-	protected function getDatalistValue(array $names = array()) {
-
-		if (!$this->dbLink) {
-			return array();
-		}
-
-		$dbConfig = $this->getDbConfig();
-		if (!mysql_select_db($dbConfig['database'], $this->dbLink)) {
-			return array();
-		}
-
-		if (empty($names)) {
-			return array();
-		}
-		$names_in = array();
-		foreach ($names as $name) {
-			$name = mysql_real_escape_string($name);
-			$names_in[] = "'$name'";
-		}
-		$names_in = implode(',', $names_in);
-
-		$values = array();
-
-		$q = "SELECT name, value
-				FROM {$this->dbPrefix}datalists
-				WHERE name IN ({$names_in})";
-
-		$result = mysql_query($q, $this->dbLink);
-		if ($result) {
-			$row = mysql_fetch_object($result);
-			while ($row) {
-				$values[$row->name] = $row->value;
-				$row = mysql_fetch_object($result);
-			}
-		}
-
-		return $values;
-	}
-
-	/**
-	 * Returns request query value
-	 *
-	 * @param string $name    Query name
-	 * @param mixed  $default Default value
-	 * @return mixed
-	 */
-	protected function get($name, $default = null) {
-		if (isset($_GET[$name])) {
-			return $_GET[$name];
-		}
-		return $default;
-	}
-
-	/**
-	 * Are the read and write connections separate?
-	 *
-	 * @return bool
-	 */
-	public function isDatabaseSplit() {
-		if (isset($this->config->db) && isset($this->config->db['split'])) {
-			return $this->config->db['split'];
-		}
-		// this was the recommend structure from Elgg 1.0 to 1.8
-		if (isset($this->config->db) && isset($this->config->db->split)) {
-			return $this->config->db->split;
-		}
-		return false;
-	}
-
-	/**
-	 * Get the connection configuration
-	 *
-	 * The parameters are in an array like this:
-	 * array(
-	 * 	'host' => 'xxx',
-	 *  'user' => 'xxx',
-	 *  'password' => 'xxx',
-	 *  'database' => 'xxx',
-	 * )
-	 *
-	 * @param int $type The connection type: READ, WRITE, READ_WRITE
-	 * @return array
-	 */
-	public function getConnectionConfig($type = self::READ_WRITE) {
-		$config = array();
-		switch ($type) {
-			case self::READ:
-			case self::WRITE:
-				$config = $this->getParticularConnectionConfig($type);
-				break;
-			default:
-				$config = $this->getGeneralConnectionConfig();
-				break;
-		}
-		return $config;
-	}
-
-	/**
-	 * Get the read/write database connection information
-	 *
-	 * @return array
-	 */
-	protected function getGeneralConnectionConfig() {
-		return array(
-			'host' => $this->config->dbhost,
-			'user' => $this->config->dbuser,
-			'password' => $this->config->dbpass,
-			'database' => $this->config->dbname,
-		);
-	}
-
-	/**
-	 * Get connection information for reading or writing
-	 *
-	 * @param string $type Connection type: 'write' or 'read'
-	 * @return array
-	 */
-	protected function getParticularConnectionConfig($type) {
-		if (is_object($this->config->db[$type])) {
-			// old style single connection (Elgg < 1.9)
-			$config = array(
-				'host' => $this->config->db[$type]->dbhost,
-				'user' => $this->config->db[$type]->dbuser,
-				'password' => $this->config->db[$type]->dbpass,
-				'database' => $this->config->db[$type]->dbname,
-			);
-		} else if (array_key_exists('dbhost', $this->config->db[$type])) {
-			// new style single connection
-			$config = array(
-				'host' => $this->config->db[$type]['dbhost'],
-				'user' => $this->config->db[$type]['dbuser'],
-				'password' => $this->config->db[$type]['dbpass'],
-				'database' => $this->config->db[$type]['dbname'],
-			);
-		} else if (is_object(current($this->config->db[$type]))) {
-			// old style multiple connections
-			$index = array_rand($this->config->db[$type]);
-			$config = array(
-				'host' => $this->config->db[$type][$index]->dbhost,
-				'user' => $this->config->db[$type][$index]->dbuser,
-				'password' => $this->config->db[$type][$index]->dbpass,
-				'database' => $this->config->db[$type][$index]->dbname,
-			);
-		} else {
-			// new style multiple connections
-			$index = array_rand($this->config->db[$type]);
-			$config = array(
-				'host' => $this->config->db[$type][$index]['dbhost'],
-				'user' => $this->config->db[$type][$index]['dbuser'],
-				'password' => $this->config->db[$type][$index]['dbpass'],
-				'database' => $this->config->db[$type][$index]['dbname'],
-			);
-		}
-		return $config;
+	private function getSiteSecret() {
+		return get_site_secret();
 	}
 
 }

@@ -30,9 +30,10 @@ class Proxy {
 	 *
 	 * @param int    $expires     Expiration in seconds
 	 * @param string $disposition Content disposition
+	 * @param bool   $persistent  Persist URL validity across multiple user sessions
 	 * @return string
 	 */
-	public function getURL($expires = 0, $disposition = '') {
+	public function getURL($expires = 0, $disposition = 'attachment', $persistent = false) {
 
 		if (!$this->file->exists()) {
 			elgg_log("Unable to resolve resource URL for a file that does not exist on filestore: " . (string) $this->file);
@@ -49,21 +50,46 @@ class Proxy {
 			return elgg_normalize_url('/404');
 		}
 
-		$query = array(
+		$data = array(
 			'expires' => $expires ? time() + $expires : 0,
 			'access_id' => (int) $this->file->access_id,
 			'last_updated' => filemtime($this->file->getFilenameOnFilestore()),
-			'disposition' => (string) $disposition,
+			'disposition' => $disposition == 'inline' ? 'i' : 'a',
+			'path' => $relative_path,
 		);
 
-		$data = $query;
-		$data['path'] = $relative_path;
+		if (!$persistent) {
+			$key = $this->getSessionCookie();
+			$data['key_type'] = 'c';
+		}
+		if (!$key) {
+			$key = $this->getSiteSecret();
+			$data['key_type'] = 's';
+		}
 
-		$query['hmac'] = HMAC::getHash($data, get_site_secret());
+		ksort($data);
+		$mac = _elgg_services()->crypto->getHmac($data, 'sha256', $key)->getToken();
 
-		$query_hash = base64_encode(serialize($query));
+		return elgg_normalize_url("mod/proxy/e{$data['expires']}/a{$data['access_id']}/l{$data['last_updated']}/d{$data['disposition']}/k{$data['key_type']}/$mac/$relative_path");
+	}
 
-		return elgg_normalize_url("/mod/proxy/$query_hash/$relative_path");
+	/**
+	 * Get current session cookie
+	 * @return string
+	 */
+	private function getSessionCookie() {
+		$global_cookies_config = _elgg_services()->config->get('cookies');
+		$cookie_config = $global_cookies_config['session'];
+		$cookie_name = $cookie_config['name'];
+		return _elgg_services()->request->cookies->get($cookie_name, '');
+	}
+
+	/**
+	 * Get site secret
+	 * @return string
+	 */
+	private function getSiteSecret() {
+		return get_site_secret();
 	}
 
 }

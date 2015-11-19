@@ -27,7 +27,7 @@ composer require hypejunction/proxy
 
 // Get a download link valid for 1 hour for current user only
 $file = get_entity($file_guid);
-$download_link = elgg_proxy_get_url($file, 3600, 'attachment', false);
+$download_link = elgg_proxy_get_url($file, 3600, 'attachment', true);
 ```
 
 ### Display an image/thumb file
@@ -39,6 +39,6 @@ $icon = new ElggFile();
 $icon->owner_guid = $owner_guid;
 $icon->setFilename("path/to/icon.jpg");
 
-$icon_link = elgg_proxy_get_url($icon, 0, 'inline', true);
+$icon_link = elgg_proxy_get_url($icon, 0, 'inline', false);
 ```
 

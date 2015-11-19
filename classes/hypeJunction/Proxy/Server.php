@@ -20,12 +20,12 @@ class Server {
 			return;
 		}
 		
-		if (!preg_match('~/e(\d+)/a(\d+)/l(\d+)/d([ia])/p([01])/([a-zA-Z0-9\-_]+)/(.*)$~', $uri, $m)) {
+		if (!preg_match('~/e(\d+)/l(\d+)/d([ia])/c([01])/([a-zA-Z0-9\-_]+)/(.*)$~', $uri, $m)) {
 			header("HTTP/1.1 400 Bad Request");
 			exit;
 		}
 
-		list(, $expires, $access_id, $last_updated, $disposition, $persistent, $mac, $path) = $m;
+		list(, $expires, $last_updated, $disposition, $use_cookie, $mac, $path) = $m;
 
 		if ($expires && $expires < time()) {
 			header("HTTP/1.1 403 Forbidden");
@@ -42,16 +42,15 @@ class Server {
 		$hmac_data = array(
 			'expires' => (int) $expires,
 			'last_updated' => (int) $last_updated,
-			'access_id' => (int) $access_id,
 			'disposition' => $disposition,
 			'path' => $path,
-			'persistent' => (int) $persistent,
+			'use_cookie' => (int) $use_cookie,
 		);
-		if (!(bool) $persistent) {
+		if ((bool) $use_cookie) {
 			$hmac_data['cookie'] = $this->getSessionCookie();
 		}
 		ksort($hmac_data);
-
+		
 		$hmac = _elgg_services()->crypto->getHmac($hmac_data, 'sha256', $key);
 		if (!$hmac->matchesToken($mac)) {
 			header("HTTP/1.1 403 Forbidden");

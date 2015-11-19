@@ -30,10 +30,10 @@ class Proxy {
 	 *
 	 * @param int    $expires     Expiration in seconds
 	 * @param string $disposition Content disposition
-	 * @param bool   $persistent  Persist URL validity across multiple user sessions
+	 * @param bool   $use_cookie  Use current session cookie in HMAC signature
 	 * @return string
 	 */
-	public function getURL($expires = 0, $disposition = 'attachment', $persistent = false) {
+	public function getURL($expires = 0, $disposition = 'attachment', $use_cookie = true) {
 
 		if (!$this->file->exists()) {
 			elgg_log("Unable to resolve resource URL for a file that does not exist on filestore: " . (string) $this->file);
@@ -52,7 +52,6 @@ class Proxy {
 
 		$data = array(
 			'expires' => $expires ? time() + $expires : 0,
-			'access_id' => (int) $this->file->access_id,
 			'last_updated' => filemtime($this->file->getFilenameOnFilestore()),
 			'disposition' => $disposition == 'inline' ? 'i' : 'a',
 			'path' => $relative_path,
@@ -60,17 +59,20 @@ class Proxy {
 
 		
 		$key = $this->getSiteSecret();
-		if ($persistent) {
-			$data['persistent'] = 1;
-		} else {
+		if ($use_cookie) {
 			$data['cookie'] = $this->getSessionCookie();
-			$data['persistent'] = 0;
+			$data['use_cookie'] = 1;
+		} else {
+			$data['use_cookie'] = 0;
 		}
 
 		ksort($data);
+
+		var_dump($data);
+		
 		$mac = _elgg_services()->crypto->getHmac($data, 'sha256', $key)->getToken();
 
-		return elgg_normalize_url("mod/proxy/e{$data['expires']}/a{$data['access_id']}/l{$data['last_updated']}/d{$data['disposition']}/p{$data['persistent']}/$mac/$relative_path");
+		return elgg_normalize_url("mod/proxy/e{$data['expires']}/l{$data['last_updated']}/d{$data['disposition']}/c{$data['use_cookie']}/$mac/$relative_path");
 	}
 
 	/**

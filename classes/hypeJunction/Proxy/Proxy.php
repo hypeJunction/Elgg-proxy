@@ -66,10 +66,7 @@ class Proxy {
 			$data['use_cookie'] = 0;
 		}
 
-		ksort($data);
-
-		var_dump($data);
-		
+		ksort($data);		
 		$mac = _elgg_services()->crypto->getHmac($data, 'sha256', $key)->getToken();
 
 		return elgg_normalize_url("mod/proxy/e{$data['expires']}/l{$data['last_updated']}/d{$data['disposition']}/c{$data['use_cookie']}/$mac/$relative_path");

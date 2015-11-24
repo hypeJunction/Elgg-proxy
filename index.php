@@ -27,8 +27,7 @@ elgg_trigger_event('boot', 'system');
 $CONFIG->boot_complete = true;
 
 try {
-	$server = new \hypeJunction\Proxy\Server();
-	$server->serve(current_page_url());
+	(new Elgg\FileService\File)->serveFromURL(current_page_url());
 } catch (Exception $e) {
 	header("HTTP/1.1 400 Bad Request");
 	exit;

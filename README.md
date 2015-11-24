@@ -25,20 +25,24 @@ composer require hypejunction/proxy
 
 ```php
 
-// Get a download link valid for 1 hour for current user only
+// Get a link to download a file
+// By default, link's validity is limited to 2 hours and restricted to current user session
+
 $file = get_entity($file_guid);
-$download_link = elgg_proxy_get_url($file, 3600, 'attachment', true);
+$download_link = elgg_get_download_url($file);
 ```
 
 ### Display an image/thumb file
 
 ```php
 
-// Get a link to display an icon that does not expire and will persist accross sessions
+// Get a link to display an icon
+// By default, link's validity is limited to 1 year and can be reused outside of the current user session
+
 $icon = new ElggFile();
 $icon->owner_guid = $owner_guid;
 $icon->setFilename("path/to/icon.jpg");
 
-$icon_link = elgg_proxy_get_url($icon, 0, 'inline', false);
+$icon_link = elgg_get_inline_url($icon);
 ```
 

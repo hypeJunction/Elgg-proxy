@@ -55,15 +55,14 @@ class File {
 	/**
 	 * Sets content disposition
 	 *
-	 * @param string $disposition Content disposition (inline or attachment)
+	 * @param string $disposition Content disposition ('inline' or 'attachment')
 	 * @return void
 	 */
 	public function setDisposition($disposition = self::DISPOSITION_ATTACHMENT) {
-		if ($disposition == self::DISPOSITION_INLINE) {
-			$this->disposition = self::DISPOSITION_INLINE;
-		} else {
-			$this->disposition = self::DISPOSITION_ATTACHMENT;
+		if (!in_array($disposition, array(self::DISPOSITION_ATTACHMENT, self::DISPOSITION_INLINE))) {
+			throw new \UnexpectedValueException("Disposition $disposition is not supported in " . __CLASS__);
 		}
+		$this->disposition = $disposition;
 	}
 
 	/**

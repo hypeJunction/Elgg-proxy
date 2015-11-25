@@ -83,7 +83,7 @@ class File {
 
 		if (!$this->file instanceof \ElggFile || !$this->file->exists()) {
 			elgg_log("Unable to resolve resource URL for a file that does not exist on filestore: " . (string) $this->file);
-			return elgg_normalize_url('/404');
+			return $this->getErrorURL();
 		}
 
 		$root_prefix = elgg_get_data_path();
@@ -93,7 +93,7 @@ class File {
 			$relative_path = substr($path, strlen($root_prefix));
 		} else {
 			elgg_log("Unable to resolve relative path of the file on the filestore");
-			return elgg_normalize_url('/404');
+			return $this->getErrorURL();
 		}
 
 		$data = array(
@@ -107,6 +107,9 @@ class File {
 		$key = get_site_secret();
 		if ($this->use_cookie) {
 			$data['cookie'] = $this->getSessionCookie();
+			if (empty($data['cookie'])) {
+				return $this->getErrorURL();
+			}
 			$data['use_cookie'] = 1;
 		} else {
 			$data['use_cookie'] = 0;
@@ -224,4 +227,13 @@ class File {
 		$cookie_name = $cookie_config['name'];
 		return _elgg_services()->request->cookies->get($cookie_name, '');
 	}
+
+	/**
+	 * Returns normalized error URL
+	 * @return string
+	 */
+	private function getErrorURL() {
+		return elgg_normalize_url('404');
+	}
+
 }

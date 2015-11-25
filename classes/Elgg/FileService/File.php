@@ -215,8 +215,11 @@ class File {
 		}
 
 		header('Expires: ' . $expires_str, true);
-		header("Pragma: public");
-		header("Cache-Control: public");
+
+		$cache_control = $use_cookie ? 'private' : 'public';
+		header("Pragma: $cache_control");
+		header("Cache-Control: $cache_control");
+
 		header("ETag: \"$etag\"");
 
 		readfile($filenameonfilestore);

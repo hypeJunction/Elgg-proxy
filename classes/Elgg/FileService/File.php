@@ -151,7 +151,7 @@ class File {
 			exit;
 		}
 
-		$etag = md5($last_updated);
+		$etag = $last_updated;
 		if (isset($_SERVER['HTTP_IF_NONE_MATCH']) && trim($_SERVER['HTTP_IF_NONE_MATCH']) == "\"$etag\"") {
 			header("HTTP/1.1 304 Not Modified");
 			exit;

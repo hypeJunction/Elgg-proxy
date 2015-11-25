@@ -11,7 +11,7 @@ class File {
 	const DISPOSITION_INLINE = 'inline';
 	const DISPOSITION_ATTACHMENT = 'attachment';
 	const DEFAULT_TTL = 7200;
-	
+
 	/**
 	 * @var \ElggFile 
 	 */
@@ -86,12 +86,18 @@ class File {
 			return $this->getErrorURL();
 		}
 
-		$root_prefix = elgg_get_data_path();
-		$path = $this->file->getFilenameOnFilestore();
-
-		if (substr($path, 0, strlen($root_prefix)) == $root_prefix) {
-			$relative_path = substr($path, strlen($root_prefix));
+		$relative_path = '';
+		if (is_callable(array($this->file, 'getPathFromDataRoot'))) {
+			$relative_path = $this->file->getPathFromDataRoot();
 		} else {
+			$root_prefix = elgg_get_data_path();
+			$path = $this->file->getFilenameOnFilestore();
+			if (substr($path, 0, strlen($root_prefix)) == $root_prefix) {
+				$relative_path = substr($path, strlen($root_prefix));
+			}
+		}
+
+		if (!$relative_path) {
 			elgg_log("Unable to resolve relative path of the file on the filestore");
 			return $this->getErrorURL();
 		}

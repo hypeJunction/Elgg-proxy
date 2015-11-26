@@ -27,7 +27,8 @@ elgg_trigger_event('boot', 'system');
 $CONFIG->boot_complete = true;
 
 try {
-	(new Elgg\FileService\File)->serveFromURL(current_page_url());
+	$config = new Elgg\Config();
+	(new Elgg\Application\ServeFileHandler($config, $_SERVER))->handleRequest($_GET['__uri']);
 } catch (Exception $e) {
 	header("HTTP/1.1 400 Bad Request");
 	exit;

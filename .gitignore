@@ -8,5 +8,6 @@ robots.txt
 /build/
 /releases/
 /vendor/
+/mod/
 composer.lock
 Gemfile.lock

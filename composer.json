@@ -13,7 +13,8 @@
 			"email": "info@hypejunction.com"
 		}
 	],
-	"require-dev": {
+	"require": {
+		"php": ">=5.5",
 		"composer/installers": "1.*"
 	},
 	"autoload": {

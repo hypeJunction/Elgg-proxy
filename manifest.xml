@@ -6,7 +6,7 @@
 
 	<description>Proxy for serving files from Elgg's filestore</description>
 	<category>files</category>
-	<version type="dist">0.0.0</version>
+	<version type="dist">1.0.0</version>
 
 	<author>Ismayil Khayredinov (info@hypejunction.com)</author>
 	<website>http://www.hypejunction.com/</website>

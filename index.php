@@ -1,34 +1,24 @@
 <?php
 
-global $CONFIG;
-if (!isset($CONFIG)) {
-	$CONFIG = new \stdClass;
-}
-$CONFIG->boot_complete = false;
+$plugin_root = __DIR__;
+$root = dirname(dirname($plugin_root));
+$alt_root = dirname(dirname(dirname($root)));
 
-// This will be overridden by the DB value but may be needed before the upgrade script can be run.
-$CONFIG->default_limit = 10;
-
-$engine_dir = dirname(dirname(__DIR__));
-$paths = array(
-	$engine_dir . '/engine/settings.php',
-	$engine_dir . '/engine/load.php',
-	$engine_dir . '/mod/proxy/vendor/autoload.php',
+$autoloaders = array(
+	"$plugin_root/vendor/autoload.php",
+	"$root/vendor/autoload.php",
+	"$alt_root/vendor/autoload.php",
 );
 
-foreach ($paths as $path) {
-	if (is_readable($path)) {
-		require_once $path;
+foreach ($autoloaders as $autoloader) {
+	if (is_readable($autoloader)) {
+		require_once $autoloader;
 	}
 }
 
-elgg_trigger_event('boot', 'system');
-
-$CONFIG->boot_complete = true;
-
 try {
-	$config = new Elgg\Config();
-	(new Elgg\Application\ServeFileHandler($config, $_SERVER))->handleRequest($_GET['__uri']);
+	\Elgg\Application::start();
+	(new Elgg\Application\ServeFileHandler(_elgg_services()->config, $_SERVER))->handleRequest($_GET['__uri']);
 } catch (Exception $e) {
 	header("HTTP/1.1 400 Bad Request");
 	exit;
